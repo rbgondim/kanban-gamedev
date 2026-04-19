@@ -237,6 +237,67 @@
     font-family:var(--font-sans); font-size:12px; font-weight:700; padding:8px 18px;
     background:var(--accent); color:#0e0e12; border:none; border-radius:var(--r-sm); cursor:pointer;
   }
+
+  /* DETAIL DRAWER */
+  .drawer-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
+    backdrop-filter:blur(2px); z-index:150;
+  }
+  .drawer-overlay.open { display:block; }
+  .drawer {
+    position:fixed; top:0; right:0; bottom:0; width:420px; max-width:95vw;
+    background:var(--surface); border-left:1px solid var(--border);
+    display:flex; flex-direction:column;
+    transform:translateX(100%); transition:transform .25s ease;
+    z-index:151;
+  }
+  .drawer-overlay.open .drawer { transform:translateX(0); }
+  .drawer-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 20px; border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .drawer-badges { display:flex; gap:6px; align-items:center; }
+  .drawer-close {
+    background:none; border:none; color:var(--text-dim); font-size:20px;
+    cursor:pointer; line-height:1; transition:color .15s; padding:2px 6px;
+  }
+  .drawer-close:hover { color:var(--text); }
+  .drawer-body { padding:20px; overflow-y:auto; flex:1; }
+  .drawer-title {
+    font-size:18px; font-weight:700; line-height:1.4;
+    margin-bottom:16px; color:var(--text);
+  }
+  .drawer-section-label {
+    font-family:var(--font-mono); font-size:9px; text-transform:uppercase;
+    letter-spacing:1px; color:var(--text-dim); margin-bottom:8px; display:block;
+  }
+  .drawer-desc {
+    font-family:var(--font-mono); font-size:12px; color:var(--text-mid);
+    line-height:1.7; white-space:pre-wrap; margin-bottom:20px;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:var(--r-sm); padding:12px 14px;
+  }
+  .drawer-desc.empty { color:var(--text-dim); font-style:italic; }
+  .drawer-meta { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
+  .drawer-meta-row { display:flex; justify-content:space-between; align-items:center; }
+  .drawer-meta-key { font-family:var(--font-mono); font-size:10px; color:var(--text-dim); }
+  .drawer-meta-val { font-family:var(--font-mono); font-size:10px; color:var(--text-mid); }
+  .drawer-footer {
+    padding:16px 20px; border-top:1px solid var(--border);
+    display:flex; gap:8px; flex-shrink:0;
+  }
+  .drawer-edit-btn {
+    flex:1; font-family:var(--font-sans); font-size:12px; font-weight:700;
+    padding:9px; background:var(--accent); color:#0e0e12;
+    border:none; border-radius:var(--r-sm); cursor:pointer; transition:all .15s;
+  }
+  .drawer-edit-btn:hover { background:#ffd860; }
+  .drawer-del-btn {
+    font-family:var(--font-sans); font-size:12px; font-weight:600;
+    padding:9px 14px; background:transparent; border:1px solid var(--border);
+    color:var(--text-dim); border-radius:var(--r-sm); cursor:pointer; transition:all .15s;
+  }
+  .drawer-del-btn:hover { border-color:var(--accent2); color:var(--accent2); }
 </style>
 </head>
 <body>
@@ -322,6 +383,43 @@
     <div class="sql-actions">
       <button class="btn-copy" onclick="copySQL()">📋 copiar SQL</button>
       <button class="btn-done" onclick="dismissSQL()">Pronto →</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL DRAWER -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <div class="drawer-badges">
+        <span class="card-area" id="d-area" style="margin:0"></span>
+        <span class="priority-badge" id="d-priority"></span>
+      </div>
+      <button class="drawer-close" onclick="closeDrawerDirect()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-title" id="d-title"></div>
+      <span class="drawer-section-label">descrição</span>
+      <div class="drawer-desc" id="d-desc"></div>
+      <span class="drawer-section-label">detalhes</span>
+      <div class="drawer-meta">
+        <div class="drawer-meta-row">
+          <span class="drawer-meta-key">status</span>
+          <span class="drawer-meta-val" id="d-status"></span>
+        </div>
+        <div class="drawer-meta-row">
+          <span class="drawer-meta-key">área</span>
+          <span class="drawer-meta-val" id="d-area-val"></span>
+        </div>
+        <div class="drawer-meta-row">
+          <span class="drawer-meta-key">criado em</span>
+          <span class="drawer-meta-val" id="d-created"></span>
+        </div>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="drawer-edit-btn" onclick="editFromDrawer()">✏ editar</button>
+      <button class="drawer-del-btn" onclick="deleteFromDrawer()">✕ deletar</button>
     </div>
   </div>
 </div>
@@ -535,7 +633,8 @@ function renderCard(c) {
     <div class="card" data-id="${c.id}" data-area="${c.area}"
          draggable="true"
          ondragstart="onDragStart(event,'${c.id}')"
-         ondragend="onDragEnd(event)">
+         ondragend="onDragEnd(event)"
+         onclick="openDrawer('${c.id}')">
       <div class="card-area" data-area="${c.area}">
         <span class="area-dot"></span>${AREA_LABEL[c.area]||c.area}
       </div>
@@ -544,9 +643,9 @@ function renderCard(c) {
       <div class="card-footer">
         <span class="priority-badge" data-p="${c.priority}">${c.priority}</span>
         <div class="card-actions">
-          <button class="card-btn" onclick="openEdit('${c.id}')">editar</button>
-          <button class="card-btn" onclick="duplicateCard('${c.id}')" title="duplicar">⧉</button>
-          <button class="card-btn delete" onclick="confirmDelete('${c.id}')">✕</button>
+          <button class="card-btn" onclick="event.stopPropagation();openEdit('${c.id}')">editar</button>
+          <button class="card-btn" onclick="event.stopPropagation();duplicateCard('${c.id}')" title="duplicar">⧉</button>
+          <button class="card-btn delete" onclick="event.stopPropagation();confirmDelete('${c.id}')">✕</button>
         </div>
       </div>
     </div>`;
@@ -622,9 +721,10 @@ async function saveCard() {
     status:   document.getElementById('f-status').value,
     position: 0,
   };
+  const idToUpdate = editingId; // captura ANTES de closeModalDirect zerar editingId
   closeModalDirect();
-  if (editingId) await apiUpdate(editingId, payload);
-  else           await apiCreate(payload);
+  if (idToUpdate) await apiUpdate(idToUpdate, payload);
+  else            await apiCreate(payload);
 }
 
 async function confirmDelete(id) {
@@ -642,6 +742,59 @@ async function duplicateCard(id) {
     status:      c.status,
     position:    c.position + 1,
   });
+}
+
+// ── DETAIL DRAWER ─────────────────────────────────────────────
+let drawerCardId = null;
+
+const COL_LABEL = { backlog:'backlog', doing:'em andamento', review:'em revisão', blocked:'bloqueado', done:'concluído' };
+
+function openDrawer(id) {
+  const c = cards.find(c=>c.id===id); if(!c) return;
+  drawerCardId = id;
+  // area badge
+  const areaEl = document.getElementById('d-area');
+  areaEl.dataset.area = c.area;
+  areaEl.innerHTML = `<span class="area-dot"></span>${AREA_LABEL[c.area]||c.area}`;
+  // priority
+  const pEl = document.getElementById('d-priority');
+  pEl.dataset.p = c.priority;
+  pEl.textContent = c.priority;
+  // content
+  document.getElementById('d-title').textContent = c.title;
+  const descEl = document.getElementById('d-desc');
+  if (c.description) {
+    descEl.textContent = c.description;
+    descEl.classList.remove('empty');
+  } else {
+    descEl.textContent = 'sem descrição';
+    descEl.classList.add('empty');
+  }
+  document.getElementById('d-status').textContent = COL_LABEL[c.status]||c.status;
+  document.getElementById('d-area-val').textContent = c.area;
+  document.getElementById('d-created').textContent = c.created_at
+    ? new Date(c.created_at).toLocaleDateString('pt-BR') : '—';
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+
+function closeDrawer(e) {
+  if (e.target===document.getElementById('drawerOverlay')) closeDrawerDirect();
+}
+function closeDrawerDirect() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+  drawerCardId = null;
+}
+function editFromDrawer() {
+  const id = drawerCardId;
+  closeDrawerDirect();
+  openEdit(id);
+}
+async function deleteFromDrawer() {
+  const c = cards.find(c=>c.id===drawerCardId); if(!c) return;
+  if (confirm(`Deletar "${c.title}"?`)) {
+    closeDrawerDirect();
+    await apiDelete(c.id);
+  }
 }
 
 // ── DRAG & DROP ────────────────────────────────────────────────
@@ -713,7 +866,7 @@ function dismissSQL() {
 
 // ── KEYBOARD ───────────────────────────────────────────────────
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape') closeModalDirect();
+  if(e.key==='Escape') { closeModalDirect(); closeDrawerDirect(); }
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openModal();}
 });
 
